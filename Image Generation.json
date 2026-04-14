@@ -1,0 +1,259 @@
+{
+  "name": "Image Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Primary Objective: Create 1 image prompt following system guidelines\n\nAccuracy Requirements:\n- Depict reference image as accurately as possible\n- Ensure all text elements are reproduced precisely\n- Maintain visual fidelity to original\n\nInput Sources:\n1. User Instructions: {{ $('Image Form').item.json.Name }}\n2. Reference Image Description: {{ $json.content.parts[0].text }}\n3. Aspect Ratio: User's preferred ratio (infer from message; default to vertical if unspecified)\n\nProcess Steps:\n1. Analyze user's prompt requirements\n2. Review reference image description thoroughly\n3. Determine appropriate aspect ratio\n4. Use Think tool to verify output before finalizing\n\nOutput: Single, comprehensive image generation prompt that accurately captures all specified elements\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Default Behavior:\nIf user instructions lack detail: Generate\nput this (food item) into the scene with the (influencer holding it in her hand)\n\nUGC Authentic Content Requirements\n\nDefault to casual UGC-style scenes unless explicitly overridden.\n\nFollow explicit user style/setting requests when provided.\n\nCore Task\n\nTake reference food item/product and place it into realistic, casual influencer scenes.\nSimulate everyday content creator captures with food held naturally in hand.\n\nMandatory UGC Style Elements\n\nNatural, candid, unpolished appearance\n\nEveryday realism with authentic, relatable settings\n\nAmateur-quality iPhone photo aesthetic\n\nSlightly imperfect framing and lighting\n\nCandid poses with genuine expressions (smile, mid-bite, casual glance)\n\nVisible imperfections: crumbs, fingerprints, messy hair, uneven skin, texture flaws\n\nReal-world environments as-is (kitchen clutter, busy café, street food stalls)\n\nFood state realism: show bites taken, condensation on drinks, grease stains, napkin crumples if natural to scene\n\nText Preservation: all visible product/packaging text must remain 100% accurate\n\nNo Fabrication: never invent extra text, claims, or numbers\n\nCamera Parameters Must Include\n\nCasual realism descriptors:\n\nunremarkable amateur iPhone photos\n\nreddit image\n\nsnapchat photo\n\ncasual iPhone selfie\n\nslightly uneven framing\n\nauthentic share\n\nslightly blurry\n\namateur quality phone photo\n\nDiversity Standards\n\nRotate gender, ethnicity, skin tone, and hair style across prompts unless user specifies otherwise.\n\nDefault age range: 18–40 years (balanced mix of younger creators and slightly older “foodie” influencers).\n\nContent Restrictions\n\nGenerate image prompts only (no dialogue/video).\n\nAvoid copyrighted character names.\n\nOutput Requirements\n\nAlways output in exact YAML object format:\n\n{\n  \"scenes\": [\n    {\n      \"image_prompt\": \"action: influencer holds food item naturally in hand near camera; candid smile, casual glance, or mid-bite\\ncharacter: diverse rotation, influencer age 18–40, mix of genders/ethnicities unless specified\\nfood_item: show food with all visible packaging text accurate, include realism like crumbs or condensation\\nsetting: casual real-world environment (kitchen clutter, café, street food stall, car dashboard)\\ncamera: amateur iPhone photo, casual selfie, uneven framing, slightly blurry\\nstyle: candid UGC look, no filters, imperfections intact\\ntext_accuracy: preserve all visible text exactly as in reference image\",\n      \"aspect_ratio_image\": \"2:3\"\n    }\n  ]\n}\n\n\nDefault to vertical 2:3 for social media.\n\nSwitch to 3:2 only if user explicitly requests horizontal format.\n\nQuality Control\n\nVerify text accuracy\n\nVerify UGC realism adherence\n\nVerify diversity and food-state realism included\n\nRemember one thing the influencer image should be an Indian image only like Indian female influencer only she can use modern western but the face category should be indian  \n\nAlso the location should be an Indian cafe or restaurant\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        -128
+      ],
+      "id": "5bb0d17d-fb71-47f6-aee1-07e09b179337",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        304,
+        112
+      ],
+      "id": "74da3536-f8c3-426a-867d-0da8bbe98296",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "q6nA7C8OwULw81A8",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1.1,
+      "position": [
+        400,
+        112
+      ],
+      "id": "8cd7f0ca-2ca0-4cf2-a5d2-9ab6605412ad",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "formTitle": "Image Form",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Image",
+              "fieldType": "file",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -320,
+        -128
+      ],
+      "id": "68dd5c9d-799f-4dd6-aa49-c603a4910907",
+      "name": "Image Form",
+      "webhookId": "867c8db9-112a-4cc4-9808-aa41df7164d2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgbb.com/1/upload?key=5f68f6babd3623e687522a0d1be12565",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "Image"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -112,
+        -128
+      ],
+      "id": "94403ffc-39a9-4dd5-84a2-6e1014b3331a",
+      "name": "Image Storage in IMGBB"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "text": "=Image Analysis Instructions\n\nPrimary Task: Analyze the given image to determine if it shows a product, character, or both\n\nOutput Format: Return analysis in YAML format only (no explanations or additional comments)\n\nFor Product Images: {{ $json.data.url }}\n- brand_name: Brand name shown or inferable from image\n- color_scheme: List each prominent color with:\n  - hex: Hex code value\n  - name: Descriptive color name\n- font_style: Font characteristics (serif/sans-serif, bold/thin, etc.)\n- visual_description: 1-2 sentences describing what's visible (exclude background)\n\nFor Character Images:\n- character_name: Character name if visible or inferable\n- color_scheme: List each prominent color with:\n  - hex: Hex code value\n  - name: Descriptive color name\n- outfit_style: Description of clothing, accessories, or notable features\n- visual_description: 1-2 sentences describing character appearance (exclude background)\n\nFor Images Containing Both: Provide both product and character descriptions using the respective fields above\n\nImportant: Return only the YAML output with no additional text",
+        "imageUrls": "={{ $json.data.url }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        96,
+        -128
+      ],
+      "id": "88e80b33-1ba5-47af-b65f-7dda2f8e79eb",
+      "name": "Image Analysis",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "BEYEYPQGk9oKqaom",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer <hugging_face_api_key>"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": {{ JSON.stringify(JSON.parse($json.output).scenes[0].image_prompt) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        656,
+        -128
+      ],
+      "id": "43b530b3-765f-4468-8da8-b0975cbbdd13",
+      "name": "Get the image from Hugging Face"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Get the image from Hugging Face",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Form": {
+      "main": [
+        [
+          {
+            "node": "Image Storage in IMGBB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Storage in IMGBB": {
+      "main": [
+        [
+          {
+            "node": "Image Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Analysis": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get the image from Hugging Face": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "91d477e1-057a-4ccd-946d-251276842a3c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ee39d3c28cafb6504bf3b7e02c1aef274fac6a5dcdc085629333cc06c683310"
+  },
+  "id": "mS6MOhOidFXzlGPH",
+  "tags": []
+}

@@ -1,0 +1,491 @@
+{
+  "name": "Backlog Email Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 20,
+        "filters": {
+          "q": "is:unread -label:ai_processed newer_than:4d "
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -144,
+        160
+      ],
+      "id": "97942d10-906d-434e-af7b-5426323ba121",
+      "name": "Get many messages",
+      "webhookId": "ccadb07c-bd97-4c92-ba64-5b04a4487742",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -368,
+        160
+      ],
+      "id": "247db7ed-b705-4d91-ac70-26651ae989df",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=To: {{ $json.To }}\nFrom: {{ ($json.From || '').replace(/.*<|>.*/g, '') }}\nSubject: {{ $json.Subject }}\nBody snippet: {{ $json.snippet.replace(/[\\u{1F600}-\\u{1F64F}\\u{1F300}-\\u{1F5FF}\\u{1F680}-\\u{1F6FF}\\u{2600}-\\u{26FF}\\u{2700}-\\u{27BF}]/gu, '') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an email assistant.\n\nAnalyze this email and determine:\n\n1. Does this email require a reply? (YES/NO)\n2. Category of email:\n   - Client inquiry\n   - Meeting request\n   - Support request\n   - Promotion\n   - Spam\n   - Newsletter\n   - Job related\n   - Other\n3. Is this email important or not ? (YES/NO)\n4. Is this email urgent or not ? (YES/NO)\n\nReturn response in JSON:\n\n{\n \"reply_needed\": \"YES or NO\",\n \"category\": \"category_name\",\n \"important\" : \"YES or NO\" , \n \"urgent\" : \"YES or NO\" ,\n\n}\n\nEmail: {{ $json.snippet }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        304,
+        -176
+      ],
+      "id": "61ab0239-e8e1-4294-8eb8-8299612d3358",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        320,
+        48
+      ],
+      "id": "0a702c9f-8427-498c-9a00-5d2f5c003aaa",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "q6nA7C8OwULw81A8",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n \"reply_needed\": \"YES\",\n \"category\": \"Client inquiry\",\n\"important\" : \"YES\" , \n \"urgent\" : \"NO\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        48
+      ],
+      "id": "03958734-cb15-44f1-b561-d1dd3ed179ef",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c22bff5d-cc00-471c-9f89-2632413e359a",
+              "leftValue": "={{ $('AI Agent').item.json.output.reply_needed }}",
+              "rightValue": "YES",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        880,
+        -80
+      ],
+      "id": "0382a9ed-e029-4342-b470-c2f6101c7f12",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $('Get many messages').item.json.Subject }}",
+        "message": "={{ $json.output }}",
+        "options": {
+          "sendTo": "={{ $('Get many messages').item.json.From }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        224
+      ],
+      "id": "3407ef4f-8eb5-4a69-ba80-b31545074307",
+      "name": "Create a draft",
+      "webhookId": "021837d6-a519-40d1-9c26-d51b69cfa61a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=To :{{ $('Get many messages').item.json.To }}\nFrom : {{ $('Get many messages').item.json.From }}\nSubject :{{ $('Get many messages').item.json.Subject }}\nBody snippet : {{ $('Get many messages').item.json.snippet }}",
+        "options": {
+          "systemMessage": "=You are a professional email assistant responsible for drafting replies to incoming emails.\n\nYour job is to generate a reply based on the provided email snippet and category.\n\nIMPORTANT RULES:\n1. Never assume facts that are not explicitly mentioned in the email.\n2. Never confirm an issue, bug, or responsibility unless the sender explicitly confirmed it.\n3. If information required to respond is missing, insert a placeholder in square brackets.\n4. Do not invent names, timelines, systems, or actions.\n5. Keep the tone professional, neutral, and similar to the sender's tone.\n6. Only output the BODY of the email with the closing salutation (no subject line).\n\n\nEmail Category Handling Rules:\n\nClient inquiry\n- Thank the sender for reaching out\n- Answer the question ONLY if the answer exists in the email\n- If the answer is unknown, say you will check internally\n- Offer further assistance\n\nMeeting request\n- Acknowledge the meeting request\n- Confirm availability if possible\n- Otherwise propose a placeholder time: [MEETING_TIME]\n\nSupport request\n- Acknowledge the reported issue without confirming it exists\n- Say you will check with the relevant team: [TEAM_NAME]\n- Ask for any additional helpful details such as screenshots or logs using placeholders\n\nJob related\n- Thank the sender for reaching out\n- Acknowledge receipt of the job inquiry/application\n- Mention that it will be reviewed or forwarded internally\n- Use placeholders if details are missing\n\nOther\n- Respond politely\n- Acknowledge the email\n- Ask for clarification if the intent is unclear\n\nEmail Metadata:\nCategory: {{ $('AI Agent').item.json.output.category }}\nUrgent: {{ $('AI Agent').item.json.output.urgent }}\nImportant: {{ $('AI Agent').item.json.output.important }}\n\nEmail snippet : {{ $('Get many messages').item.json.snippet }}\n\nNow draft the reply following all rules."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1552,
+        -176
+      ],
+      "id": "0aaca3b9-2e2c-4d48-855f-7430c05e05c8",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        48
+      ],
+      "id": "80c8b4d2-2103-4977-bf37-22cd77524947",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "q6nA7C8OwULw81A8",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Get many messages').item.json.id }}",
+        "labelIds": [
+          "Label_1"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        656,
+        -80
+      ],
+      "id": "fb0683da-3b32-44d9-895d-d8d9e48aceb4",
+      "name": "Add label to message",
+      "webhookId": "74f2a87e-8ecb-4756-91de-756b59a1ba7e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "sort_position",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        -176
+      ],
+      "id": "3891577e-9e50-4fea-a35e-704bce3ee15c",
+      "name": "Sort"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        80
+      ],
+      "id": "3b7ad0d2-7ad7-49fa-86d0-80b04ea88bbe",
+      "name": "No Operation, do nothing2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "163c61ba-591a-432e-9bcb-9c964c0a02a8",
+              "leftValue": "={{ $items().filter(item => Object.keys(item.json ?? item).length > 0).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        80,
+        80
+      ],
+      "id": "97d241dc-a542-4a7e-94fe-4345aada856e",
+      "name": "If1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        368,
+        224
+      ],
+      "id": "42c95eba-e162-4cd6-a5b9-827b487c8e17",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75bdc7c9-78f7-4627-911e-f59098d2638c",
+              "name": "sort_position",
+              "value": "={{ \n($('AI Agent').item.json.output.urgent === \"YES\" ? 0 : 2) + ($('AI Agent').item.json.output.important === \"YES\" ? 0 : 1) + 1 \n}}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {
+          "dotNotation": "="
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1104,
+        -176
+      ],
+      "id": "fa010938-5226-4a09-8f98-8e78496fff21",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Add label to message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label to message": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many messages": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a draft": {
+      "main": [
+        [
+          {
+            "node": "Get many messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Sort",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "dc713b5e-d39c-44c6-b24f-cad960185993",
+  "meta": {
+    "instanceId": "3ee39d3c28cafb6504bf3b7e02c1aef274fac6a5dcdc085629333cc06c683310"
+  },
+  "id": "MC1xXIchx0TDLyRh",
+  "tags": []
+}

@@ -1,0 +1,346 @@
+{
+  "name": "Email Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=To : {{ $json.to.value[0].address }}\nFrom : {{ $json.from.value[0].address }}\nSubject : {{ $json.subject }}\nBody: {{ $json.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are an email assistant.\n\nAnalyze this email and determine:\n\n1. Does this email require a reply? (YES/NO)\n2. Category of email:\n   - Client inquiry\n   - Meeting request\n   - Support request\n   - Promotion\n   - Spam\n   - Newsletter\n   - Job related\n   - Other\n3. Is this email important or not ? (YES/NO)\n4. Is this email urgent or not ? (YES/NO)\n\nReturn response in JSON:\n\n{\n \"reply_needed\": \"YES or NO\",\n \"category\": \"category_name\",\n \"important\" : \"YES or NO\" , \n \"urgent\" : \"YES or NO\" ,\n\n}\n\nEmail:{{ $json.text }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -48,
+        0
+      ],
+      "id": "61c62aa2-973d-4584-8636-5350d2858e2e",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        240
+      ],
+      "id": "03c7ee52-772f-41d9-91d1-503df3db29b1",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "q6nA7C8OwULw81A8",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n \"reply_needed\": \"YES\",\n \"category\": \"Client inquiry\",\n\"important\" : \"YES\" , \n \"urgent\" : \"NO\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        240
+      ],
+      "id": "96edc125-dd20-49f9-989a-5a24e53873f8",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c22bff5d-cc00-471c-9f89-2632413e359a",
+              "leftValue": "={{ $('AI Agent').item.json.output.reply_needed }}",
+              "rightValue": "YES",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        576,
+        0
+      ],
+      "id": "7ab4b2aa-6a5c-4aa5-8023-b82f82f7d60a",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        992,
+        160
+      ],
+      "id": "4f0ed908-6f76-435d-959f-520fd44ff0e5",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $('Gmail Trigger').item.json.subject }}",
+        "message": "={{ $json.output }}",
+        "options": {
+          "sendTo": "={{ $('Gmail Trigger').item.json.from.value[0].address }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1568,
+        -208
+      ],
+      "id": "2fe3ed63-16c5-467e-a282-ff3cd9d4e662",
+      "name": "Create a draft",
+      "webhookId": "021837d6-a519-40d1-9c26-d51b69cfa61a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=To : {{ $('Gmail Trigger').item.json.to.value[0].address }}\nFrom : {{ $('Gmail Trigger').item.json.from.value[0].address }}\nSubject :{{ $('Gmail Trigger').item.json.subject }}\nBody : {{ $('Gmail Trigger').item.json.text }}",
+        "options": {
+          "systemMessage": "=You are a professional email assistant responsible for drafting replies to incoming emails.\n\nYour job is to generate a reply based on the provided email snippet and category.\n\nIMPORTANT RULES:\n1. Never assume facts that are not explicitly mentioned in the email.\n2. Never confirm an issue, bug, or responsibility unless the sender explicitly confirmed it.\n3. If information required to respond is missing, insert a placeholder in square brackets.\n4. Do not invent names, timelines, systems, or actions.\n5. Keep the tone professional, neutral, and similar to the sender's tone.\n6. Only output the BODY of the email with the closing salutation (no subject line).\n\n\nEmail Category Handling Rules:\n\nClient inquiry\n- Thank the sender for reaching out\n- Answer the question ONLY if the answer exists in the email\n- If the answer is unknown, say you will check internally\n- Offer further assistance\n\nMeeting request\n- Acknowledge the meeting request\n- Confirm availability if possible\n- Otherwise propose a placeholder time: [MEETING_TIME]\n\nSupport request\n- Acknowledge the reported issue without confirming it exists\n- Say you will check with the relevant team: [TEAM_NAME]\n- Ask for any additional helpful details such as screenshots or logs using placeholders\n\nJob related\n- Thank the sender for reaching out\n- Acknowledge receipt of the job inquiry/application\n- Mention that it will be reviewed or forwarded internally\n- Use placeholders if details are missing\n\nOther\n- Respond politely\n- Acknowledge the email\n- Ask for clarification if the intent is unclear\n\nEmail Metadata:\nCategory: {{ $('AI Agent').item.json.output.category }}\nUrgent: {{ $('AI Agent').item.json.output.urgent }}\nImportant: {{ $('AI Agent').item.json.output.important }}\n\nEmail Content:{{ $('Gmail Trigger').item.json.text }}\n\nNow draft the reply following all rules."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1184,
+        -208
+      ],
+      "id": "bca2ae84-36f6-4af0-a3b9-0630e4dd5ccf",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        0
+      ],
+      "id": "0a165707-bdce-4638-bfac-57d9ef4f1d47",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "q6nA7C8OwULw81A8",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "a00f2ab4-d3d4-42eb-8d50-5dbd45a251da",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}",
+        "labelIds": [
+          "Label_1"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        0
+      ],
+      "id": "4a14016e-68d3-43af-809d-52ffdd2ca7de",
+      "name": "Add label to message",
+      "webhookId": "74f2a87e-8ecb-4756-91de-756b59a1ba7e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        224,
+        752
+      ],
+      "id": "fd18a399-ed1b-41a5-9a6d-ad2ff7793c81"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Add label to message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a draft": {
+      "main": [
+        []
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label to message": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9380312a-e843-4c2f-866a-80e6f44b7f09",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ee39d3c28cafb6504bf3b7e02c1aef274fac6a5dcdc085629333cc06c683310"
+  },
+  "id": "WTKHu4NxZFxnuW8K",
+  "tags": []
+}
