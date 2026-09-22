@@ -1,0 +1,677 @@
+{
+  "name": "Leave Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "4f9d0ed8-8993-4436-bfc2-77f2c5e9e022",
+      "name": "Parse CSV",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// const incomingEmail = $('Gmail Trigger').first().json.From\n\n// const incomingEmail = \"bob.jones@example.com\"\n\nconst incomingEmail = \"alice.smith@example.com\"\n\n// const requestData = $('Gmail Trigger').first().json.snippet\n\nconst requestedDays = $('AI Agent').first().json.output.days_requested\n\n//append requestedDays inside the json\nfor (const item of $input.all()) {\n  if (item.json.Email === incomingEmail) {\n    item.json.requestedDays = requestedDays;\n    return item;\n  }\n}\nthrow new Error('Employee not found in CSV');"
+      },
+      "id": "72114c96-7f09-4706-aaa8-d0e81c47e9eb",
+      "name": "Find Employee Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseInt($json.Leaves_Taken_This_Month) + parseInt($json.requestedDays) }}",
+              "operation": "smallerEqual",
+              "value2": 5
+            }
+          ]
+        }
+      },
+      "id": "9dd8a7cf-e672-4d1f-81f6-f0455330eca3",
+      "name": "Check Leave Limit",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        560,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let item = $input.first();\n\nitem.json.Leaves_Taken_This_Month = (\n  Number(item.json.Leaves_Taken_This_Month) +\n  Number(item.json.requestedDays)\n).toString();\n\nreturn item;"
+      },
+      "id": "4d6eed6b-7d1f-4326-b4cb-e6d6a9bf441b",
+      "name": "Update Leave Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toFile",
+        "fileFormat": "csv",
+        "options": {}
+      },
+      "id": "ab4d366d-7c5a-4e3e-b0a8-44e22b0c988b",
+      "name": "Convert back to CSV",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Email Body:\n{{ $json.snippet }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a precise data extraction assistant responsible for parsing employee leave request emails. \n\nYour sole task is to determine the total number of leave days the employee is requesting.\n\nRules:\n1. Carefully read the email body text.\n2. Calculate the exact number of calendar days being requested. (e.g., \"Thursday and Friday\" = 2, \"a week\" = 5 or 7 depending on context, \"1 day\" = 1).\n3. If a date range is given, calculate the total days.\n4. You must reply ONLY with a valid, clean JSON object. \n5. Do NOT wrap the JSON in markdown code blocks (do not use ```json).\n6. Do NOT include any greeting, explanation, or extra characters.\n\nExpected Output Format:\n{\"days_requested\": <number>}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -576,
+        96
+      ],
+      "id": "bb79899f-6573-4eba-9f72-aca4b359ea83",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -832,
+        96
+      ],
+      "id": "5cad2807-f1da-4f64-b0a0-12517c60ac69",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Trigger').item.json.From }}",
+        "subject": "={{ $('Gmail Trigger').item.json.Subject }}",
+        "emailType": "text",
+        "message": "=You're leave has been approved. You have now {{ 5 - parseInt($('Update row(s)').item.json.Leaves_Taken_This_Month) }} {{ 5 - parseInt($('Update row(s)').item.json.Leaves_Taken_This_Month) ==1 ? \"leave\" : \"leaves\" }} left this month. \nRegards, Admin",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1792,
+        -32
+      ],
+      "id": "44c84481-c8d8-484d-bd58-828d1359ff6c",
+      "name": "Send a message",
+      "webhookId": "8b270066-3ffc-4295-b808-300d92d10061",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Trigger').item.json.From }}",
+        "subject": "={{ $('Gmail Trigger').item.json.Subject }}",
+        "emailType": "text",
+        "message": "You're leave has not been approved as you have already taken 5 leaves this month.\nRegards, Admin",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        208
+      ],
+      "id": "f15208c1-2d80-444a-a0f4-2d80f0a503e9",
+      "name": "Send a message1",
+      "webhookId": "8b270066-3ffc-4295-b808-300d92d10061",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yhMokNydI8T4bonv",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"days_requested\": 2}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -416,
+        304
+      ],
+      "id": "1a1220ef-2a1a-4de8-904a-57be7d76a94d",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        320
+      ],
+      "id": "d55610a8-937d-47f7-87e0-d47028d0dd60",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "q6nA7C8OwULw81A8",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1En4ydfvK20aNVPM4pHsYrxtrmAyfGSKp",
+          "mode": "list",
+          "cachedResultName": "attendance.csv",
+          "cachedResultUrl": "https://drive.google.com/file/d/1En4ydfvK20aNVPM4pHsYrxtrmAyfGSKp/view?usp=drivesdk"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -224,
+        96
+      ],
+      "id": "90d39089-3cb6-4502-a2bd-c8f4c2a9d322",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vKrM0BGe8EB8Pu0p",
+          "name": "Google Drive account: pqrx159"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "fileId": {
+          "__rl": true,
+          "value": "1En4ydfvK20aNVPM4pHsYrxtrmAyfGSKp",
+          "mode": "list",
+          "cachedResultName": "attendance.csv",
+          "cachedResultUrl": "https://drive.google.com/file/d/1En4ydfvK20aNVPM4pHsYrxtrmAyfGSKp/view?usp=drivesdk"
+        },
+        "changeFileContent": true,
+        "newUpdatedFileName": "updated_attendance.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1600,
+        -32
+      ],
+      "id": "e48a389c-e968-4b3a-ad28-6b8b587647d3",
+      "name": "Update file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vKrM0BGe8EB8Pu0p",
+          "name": "Google Drive account: pqrx159"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "aVnCMxJ1oUzfQrST",
+          "mode": "list",
+          "cachedResultName": "Leave Table",
+          "cachedResultUrl": "/projects/Dl6Ylrrj2a2SQxT8/datatables/aVnCMxJ1oUzfQrST"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Employee_ID": "={{ $json.Employee_ID }}",
+            "Name": "={{ $json.Name }}",
+            "Email": "={{ $json.Email }}",
+            "Leaves_Taken_This_Month": "={{ $json.Leaves_Taken_This_Month }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Employee_ID",
+              "displayName": "Employee_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Leaves_Taken_This_Month",
+              "displayName": "Leaves_Taken_This_Month",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requestedDays",
+              "displayName": "requestedDays",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        96
+      ],
+      "id": "c4bed517-5403-4a2e-ad60-e66a0c5f8db8",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "aVnCMxJ1oUzfQrST",
+          "mode": "list",
+          "cachedResultName": "Leave Table",
+          "cachedResultUrl": "/projects/Dl6Ylrrj2a2SQxT8/datatables/aVnCMxJ1oUzfQrST"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "Email",
+              "keyValue": "={{ $('Find Employee Record').item.json.Email }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Leaves_Taken_This_Month": "={{ $json.Leaves_Taken_This_Month }}",
+            "requestedDays": "={{ $json.requestedDays }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Employee_ID",
+              "displayName": "Employee_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Leaves_Taken_This_Month",
+              "displayName": "Leaves_Taken_This_Month",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requestedDays",
+              "displayName": "requestedDays",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        -32
+      ],
+      "id": "4c5932bd-044f-4478-9356-5e4e69f124cc",
+      "name": "Update row(s)"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "aVnCMxJ1oUzfQrST",
+          "mode": "list",
+          "cachedResultName": "Leave Table",
+          "cachedResultUrl": "/projects/Dl6Ylrrj2a2SQxT8/datatables/aVnCMxJ1oUzfQrST"
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1168,
+        -32
+      ],
+      "id": "cd763d06-5111-4558-bc19-bdffb758ce6d",
+      "name": "Get row(s)"
+    }
+  ],
+  "pinData": {
+    "Gmail Trigger": [
+      {
+        "json": {
+          "id": "19f18d3a697355fe",
+          "threadId": "19f18d2c3b241d05",
+          "snippet": "Hi Admin, I am writing to formally request 2 days of leave for this coming Thursday and Friday. I have some personal matters to attend to. Let me know if this is approved. Best regards, Alice",
+          "payload": {
+            "mimeType": "multipart/alternative"
+          },
+          "sizeEstimate": 967,
+          "historyId": "170930",
+          "internalDate": "1782827949000",
+          "labels": [
+            {
+              "id": "SENT",
+              "name": "SENT"
+            },
+            {
+              "id": "INBOX",
+              "name": "INBOX"
+            },
+            {
+              "id": "IMPORTANT",
+              "name": "IMPORTANT"
+            },
+            {
+              "id": "UNREAD",
+              "name": "UNREAD"
+            }
+          ],
+          "Subject": "Leave Request - Alice Smith",
+          "From": "xyz pqr <pqrx159@gmail.com>",
+          "To": "xyz pqr <pqrx159@gmail.com>"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Parse CSV": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Employee Record": {
+      "main": [
+        [
+          {
+            "node": "Check Leave Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Leave Limit": {
+      "main": [
+        [
+          {
+            "node": "Update Leave Count",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Leave Count": {
+      "main": [
+        [
+          {
+            "node": "Update row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert back to CSV": {
+      "main": [
+        [
+          {
+            "node": "Update file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Parse CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update file": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "Find Employee Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row(s)": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Convert back to CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c732e3d1-1c02-4c03-a765-f3f692583dcb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3ee39d3c28cafb6504bf3b7e02c1aef274fac6a5dcdc085629333cc06c683310"
+  },
+  "id": "p7yR0xhnAp6dzqBI",
+  "tags": []
+}

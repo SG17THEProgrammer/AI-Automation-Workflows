@@ -1,0 +1,9 @@
+archived_cleaner_session.session
+my_telegram_session.session
+telegram_organizer.log
+tg_organizer.session
+.venv
+organizer_progress.json
+forwarded_ids.json
+sent_files.json
+.env
